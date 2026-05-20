@@ -158,13 +158,13 @@ class ChatApp(ctk.CTk):
         # ── Main area ─────────────────────────────────────────────────────────
         main = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         main.grid(row=0, column=1, sticky="nsew")
-        main.grid_rowconfigure(1, weight=1)
-        main.grid_columnconfigure(0, weight=1)
 
-        # Top bar
+        # ── Use pack for the three main rows — more reliable than grid on Linux ──
+
+        # Top bar (pack first at TOP)
         ctrl_bar = ctk.CTkFrame(main, fg_color=C_SIDEBAR, corner_radius=0, height=48)
-        ctrl_bar.grid(row=0, column=0, sticky="ew")
-        ctrl_bar.grid_propagate(False)
+        ctrl_bar.pack(side=tk.TOP, fill=tk.X)
+        ctrl_bar.pack_propagate(False)
         ctrl_bar.grid_columnconfigure(0, weight=1)
 
         # Right: buttons
@@ -185,13 +185,20 @@ class ChatApp(ctk.CTk):
         )
         self._clear_btn.pack(side=tk.LEFT, padx=(8, 2))
 
-        # Chat scroll area
+        # Input bar (pack at BOTTOM before scroll so it stays pinned)
+        inp_bar = ctk.CTkFrame(main, fg_color=C_SIDEBAR, corner_radius=0, height=84)
+        inp_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        inp_bar.pack_propagate(False)
+        inp_bar.grid_columnconfigure(0, weight=1)
+        inp_bar.grid_rowconfigure(0, weight=1)
+
+        # Chat scroll area (fills remaining space)
         self._scroll = ctk.CTkScrollableFrame(
             main, fg_color=C_BG, corner_radius=0,
             scrollbar_button_color=C_BORDER,
             scrollbar_button_hover_color=C_ACCENT,
         )
-        self._scroll.grid(row=1, column=0, sticky="nsew")
+        self._scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self._scroll.grid_columnconfigure(0, weight=1)
         try:
             self._scroll._scrollable_frame.grid_columnconfigure(0, weight=1)
@@ -199,18 +206,13 @@ class ChatApp(ctk.CTk):
             pass
         self._scroll_row = 0
 
-        # Input bar
-        inp_bar = ctk.CTkFrame(main, fg_color=C_SIDEBAR, corner_radius=0, height=84)
-        inp_bar.grid(row=2, column=0, sticky="ew")
-        inp_bar.grid_propagate(False)
-        inp_bar.grid_columnconfigure(0, weight=1)
-
+        _entry_bw = 1 if _sys.platform == "win32" else 2
         self._entry = ctk.CTkEntry(
             inp_bar, placeholder_text="พิมพ์ข้อความ…",
             fg_color=C_INPUT_BG, border_color=C_BORDER,
             text_color=C_TEXT, placeholder_text_color=C_DIM,
             font=ctk.CTkFont(_FONT_UI, 16),
-            corner_radius=25, height=50, border_width=1,
+            corner_radius=25, height=50, border_width=_entry_bw,
         )
         self._entry.grid(row=0, column=0, padx=(14, 8), pady=15, sticky="ew")
         self._entry.bind("<Return>",   lambda _: self._send())
@@ -224,10 +226,10 @@ class ChatApp(ctk.CTk):
             pass
 
         self._send_btn = ctk.CTkButton(
-            inp_bar, text="↑", width=50, height=50,
+            inp_bar, text="▲", width=50, height=50,
             fg_color=C_ACCENT, hover_color="#c8a020",
             text_color="#1a0e04", corner_radius=25,
-            font=ctk.CTkFont(_FONT_SYS, 20, "bold"),
+            font=ctk.CTkFont(_FONT_SYS, 18, "bold"),
             command=self._send,
         )
         self._send_btn.grid(row=0, column=1, padx=(0, 14), pady=15)
@@ -297,46 +299,55 @@ class ChatApp(ctk.CTk):
         self._sidebar_avatar_lbl._img = img
 
     _EMO_NSFW  = ("เย็ด","ควย","หี","เงี่ยน","เสียว","น้ำแตก","อม","เลีย","นม","หัวนม",
-                  "ก้น","เปียก","แข็ง","เปลือย","ถอด","ลูบ","จับ","18+","sex","ตรงนั้น",
-                  "naughty","horny","wet","cum","cock","pussy","boob","ass","naked","moan")
+                  "ก้น","เปียก","แข็ง","เปลือย","ถอด","ลูบ","จับ","18+","ตรงนั้น",
+                  "เล้าโลม","โป๊","ซักซวย","ใส่","สอด","ดูด","ถลก","ออร์แกสม์",
+                  "sex","naughty","horny","wet","cum","cock","pussy","boob","ass","naked","moan")
     _EMO_HEAVY = ("แม่ง","เหี้ย","ควาย","ห่า","สัตว์","ระยำ","ชิบหาย","สถุล",
                   "fuck","shit","bitch","asshole")
     _EMO_MILD  = ("โง่","บ้า","กาก","ขยะ","ไร้สาระ","น่าเกลียด","ไอ้","อี","มึง",
                   "stupid","idiot","dumb","เลว","ชั่ว","แย่","ห่วย")
-    _EMO_BLUSH = ("รัก","ชอบ","สวย","น่ารัก","หอม","กอด","จูบ","kiss","cute","แอบชอบ",
-                  "เป็นแฟน","คิดถึง","love","like","beautiful","pretty","hug","miss",
-                  "darling","honey")
-    _EMO_HAPPY = ("ดีใจ","สนุก","ยินดี","เยี่ยม","สุดยอด","ดีมาก","ขอบคุณ","ขำ","555",
-                  "หัวเราะ","ฮา","เฮฮา","ยิ้ม","ตลก","โอเค","เจ๋ง","เก่ง",
-                  "happy","fun","thanks","haha","great","awesome","funny","lol","hehe")
+    _EMO_BLUSH = ("รักพี่","ชอบพี่","แอบชอบ","เป็นแฟน","คิดถึงพี่","กอด","จูบ",
+                  "น่ารัก","หอม","เขิน","ฟิน","อาย","ใจสั่น","หวาน","โรแมนติก",
+                  "kiss","cute","love","beautiful","pretty","hug","miss","darling","honey","romantic")
+    _EMO_HAPPY = ("ดีใจ","สนุก","ยินดี","เยี่ยม","สุดยอด","ดีมาก","ขอบคุณ","ขำ",
+                  "555","ฮา","ฮ่า","ฮ้า","ฮิ","เฮฮา","ยิ้ม","ตลก","โอเค","เจ๋ง","เก่ง",
+                  "ปัง","เลิศ","มีความสุข","สนุกมาก","ดีเลย","เฮ",
+                  "happy","fun","thanks","haha","hehe","great","awesome","funny","lol","lmao","yay")
     _EMO_POUT  = ("เบื่อ","เซ็ง","ไม่อยาก","งอน","หงุดหงิด","ไม่สนุก","เฉยๆ","ก็ได้",
+                  "ไม่ชอบ","ไม่โอเค","งอนนะ","เซ็งเลย","หน้าบึ้ง",
                   "bored","annoyed","sulking","whatever","meh")
     _EMO_SAD   = ("เสียใจ","เศร้า","น่าเสียดาย","ขอโทษ","โชคไม่ดี","เป็นห่วง","หดหู่",
-                  "sad","sorry","unfortunate","worried","upset","heartbroken")
+                  "ร้องไห้","น้ำตา","หัวใจหัก","เหนื่อย","ท้อ","เจ็บปวด","เจ็บใจ",
+                  "sad","sorry","unfortunate","worried","upset","heartbroken","cry","tired")
     _EMO_SHOCK = ("โอ้โห","ว้าว","น่าแปลก","ไม่น่าเชื่อ","จริงเหรอ","อ้าว","ตกใจ",
-                  "wow","really","no way","seriously","omg","whoa")
+                  "เฮ้ย","เอ้ย","ช็อค","แปลกมาก","ไม่คิดว่า",
+                  "wow","no way","seriously","omg","whoa","what the")
     _EMO_FEAR  = ("กลัว","น่ากลัว","สยอง","ขนลุก","หลอน","ผี","วิญญาณ","ปีศาจ",
-                  "scary","horror","ghost","creepy","terrifying","dark")
+                  "ไม่กล้า","สะพรึง","น่าหวาดเสียว",
+                  "scary","horror","ghost","creepy","terrifying","dark","fear")
 
     def _detect_emotion(self, bot_text, user_text=""):
-        combined = bot_text + user_text
+        # .lower() only affects ASCII — Thai chars are unaffected
+        combined = (bot_text + user_text).lower()
+        bot_lo   = bot_text.lower()
+        user_lo  = user_text.lower()
 
-        if any(c in combined for c in "😡🤬💢😤"):                  return 5
-        if any(c in combined for c in "😒😑🙄😞"):                  return 6
-        if any(c in combined for c in "😢😭😔💔😿"):                return 2
-        if any(c in combined for c in "😱😮😲🤯"):                  return 7
-        if any(c in combined for c in "😳🥺😘💋🫦😏🤤😈💕💗❤️🥰😍🔞💦"): return 4
-        if any(c in combined for c in "😊😄😁🎉✨😆😂🤣😋😜🥳"):    return 1
+        if any(c in combined for c in "😡🤬💢😤"):                       return 5
+        if any(c in combined for c in "😒😑🙄"):                         return 6
+        if any(c in combined for c in "😢😭😔💔😿"):                     return 2
+        if any(c in combined for c in "😱😮😲🤯"):                       return 7
+        if any(c in combined for c in "😳😘💋🫦😏🤤😈💕💗❤🥰😍🔞💦"):  return 4
+        if any(c in combined for c in "😊😄😁🎉✨😆😂🤣😋😜🥳"):         return 1
 
-        if any(k in combined  for k in self._EMO_NSFW):  return 4
-        if any(k in user_text for k in self._EMO_HEAVY): return 5
-        if any(k in user_text for k in self._EMO_MILD):  return 3
-        if any(k in combined  for k in self._EMO_BLUSH): return 4
-        if any(k in bot_text  for k in self._EMO_HAPPY): return 1
-        if any(k in bot_text  for k in self._EMO_POUT):  return 6
-        if any(k in bot_text  for k in self._EMO_SAD):   return 2
-        if any(k in combined  for k in self._EMO_FEAR):  return 7
-        if any(k in combined  for k in self._EMO_SHOCK): return 7
+        if any(k in combined for k in self._EMO_NSFW):   return 4
+        if any(k in user_lo  for k in self._EMO_HEAVY):  return 5
+        if any(k in user_lo  for k in self._EMO_MILD):   return 3
+        if any(k in combined for k in self._EMO_BLUSH):  return 4
+        if any(k in bot_lo   for k in self._EMO_HAPPY):  return 1
+        if any(k in bot_lo   for k in self._EMO_POUT):   return 6
+        if any(k in bot_lo   for k in self._EMO_SAD):    return 2
+        if any(k in combined for k in self._EMO_FEAR):   return 7
+        if any(k in combined for k in self._EMO_SHOCK):  return 7
         return 0
 
     # ── Font size ─────────────────────────────────────────────────────────────
@@ -558,11 +569,11 @@ class ChatApp(ctk.CTk):
                     elif act == "done":
                         if len(msg) > 1:
                             self._last_bot_display = msg[1]
-                        self._finish_bot_bubble()
                         self.busy = False
                         self._set_ui(True)
                         self._status_lbl.configure(text="ออนไลน์")
                         self._status_dot.configure(text_color=C_ONLINE)
+                        self._finish_bot_bubble()
                         bot_txt  = self._last_bot_display
                         user_txt = self._last_user_display
                         if self._avatar_frames and (bot_txt or user_txt):
@@ -641,8 +652,17 @@ class ChatApp(ctk.CTk):
             menu.grab_release()
 
     def _clear_chat(self):
-        if self.busy:
-            return
+        # Signal any running generation thread to stop
+        self._stop_event.set()
+        # Drain stale queue items so no leftover "token"/"done" messages fire after clear
+        while True:
+            try:
+                self.gui_q.get_nowait()
+            except queue.Empty:
+                break
+        # Force-reset state regardless of busy flag
+        self.busy           = False
+        self._type_active   = False
         for bbl, _ in self._bubbles:
             try:
                 bbl.destroy()
@@ -655,15 +675,18 @@ class ChatApp(ctk.CTk):
         self._bot_text      = ""
         self._type_buf      = ""
         self._type_pos      = 0
-        self._type_active   = False
         self._auto_scroll   = True
-        self._entry.focus_set()
+        self._stop_event.clear()
+        self._set_ui(True)
+        self._status_lbl.configure(text="ออนไลน์")
+        self._status_dot.configure(text_color=C_ONLINE)
+        self.after(10, lambda: self._entry._entry.focus_set())
 
     def _set_ui(self, on):
         self._entry.configure(state="normal" if on else "disabled")
         self._clear_btn.configure(state="normal" if on else "disabled")
         if on:
-            self._send_btn.configure(state="normal", text="↑",
+            self._send_btn.configure(state="normal", text="▲",
                                      fg_color=C_ACCENT, hover_color="#c8a020")
             # CTkEntry may rebind its internal widget on state change — re-apply ours
             try:
@@ -671,7 +694,7 @@ class ChatApp(ctk.CTk):
             except Exception:
                 pass
         else:
-            self._send_btn.configure(state="normal", text="■",
+            self._send_btn.configure(state="normal", text="◼",
                                      fg_color="#8b2020", hover_color="#c0392b")
 
     # ── Model loading ─────────────────────────────────────────────────────────
@@ -820,5 +843,9 @@ class ChatApp(ctk.CTk):
 
         if llm_ok and raw:
             self.messages.append({"role": "assistant", "content": _strip_md(clean)})
+
+        if not clean and not self._stop_event.is_set():
+            clean = "ขอโทษนะพี่ หนูสับสนนิดหน่อย ลองถามใหม่ได้เลย"
+            self.gui_q.put(("token", clean))
 
         self.gui_q.put(("done", clean))

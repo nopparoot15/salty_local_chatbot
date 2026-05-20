@@ -1,6 +1,12 @@
 import sys, io, os
 
-os.environ["HF_HOME"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
+# Ensure the directory containing app.py is always on sys.path so that
+# `src` is importable regardless of which directory the script is launched from.
+_app_dir = os.path.dirname(os.path.abspath(__file__))
+if _app_dir not in sys.path:
+    sys.path.insert(0, _app_dir)
+
+os.environ["HF_HOME"] = os.path.join(_app_dir, "cache")
 
 if sys.stdout is None:
     sys.stdout = io.StringIO()

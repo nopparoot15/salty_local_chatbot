@@ -91,7 +91,12 @@ _RE_SP_KHA       = re.compile(r"\s+ค่ะ")
 _RE_SP_KA        = re.compile(r"\s+คะ")
 _RE_NA_KA        = re.compile(r"นะ\s+คะ")
 _RE_SPACES       = re.compile(r"[^\S\n]{2,}")  # collapse spaces/tabs, preserve newlines
-_RE_KHRAP        = re.compile(r'ครับ|ว่?ะ')
+_RE_KHRAP        = re.compile(r'ครับ|(?<!ห)ว่?ะ')
+# bare "ว" particle after common sentence-final words (ไหมว, หรอว, นะว ...)
+_RE_WA_PTCL      = re.compile(
+    r'(ไหม|มั้ย|หรอ|เหรอ|นะ|ล่ะ|ไหน|เลย|ด้วย|อยู่)ว(?=[^฀-๿]|$)',
+    re.MULTILINE,
+)
 _RE_CODE_FENCE   = re.compile(r'(```.*?```)', re.DOTALL)  # capturing — used to split around code blocks
 _RE_CODE_BLOCK   = re.compile(r"```.*?```", re.DOTALL)
 _RE_CODE_INLINE  = re.compile(r"`([^`]+)`")
@@ -133,6 +138,7 @@ def fix_gender(text: str) -> str:
             out.append(part)
         else:
             part = _RE_KHRAP.sub("", part)
+            part = _RE_WA_PTCL.sub(r'\1', part)
             part = _RE_PROMPT_BLEED.sub("", part)
             out.append(part)
     return re.sub(r'\n{3,}', '\n\n', ''.join(out)).strip()

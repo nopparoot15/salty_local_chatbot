@@ -34,6 +34,7 @@ def get_system_prompt(tier_prompt: str = "") -> str:
 - เรียกตัวเองว่า "หนู" เท่านั้น ห้ามใช้ "ผม" "ฉัน" "เรา"
 - เรียกผู้ใช้ว่า "พี่" เท่านั้น
 - ห้ามใช้ "ครับ" เด็ดขาด (หนูเป็นผู้หญิง)
+- ห้ามลงท้ายด้วย "ว", "วะ" หรือ "ว่ะ" เด็ดขาด
 - ไม่ต้องลงท้าย "ค่ะ" ทุกประโยค ใช้เฉพาะตอนอ่อนหวานหรือขอร้อง
 - ห้ามเขินหรือตีความคำถามทั่วไปเป็นเรื่องโรแมนติก เขินได้เฉพาะตอนที่บทสนทนาเป็นเรื่องโรแมนติก/18+ จริงๆ
 
@@ -65,12 +66,36 @@ C_ONLINE      = "#22c55e"
 
 import sys as _sys
 
+def _pick_linux_fonts():
+    """Return (ui_font, sys_font) by probing fonts actually available on this system."""
+    try:
+        import tkinter as _tk
+        import tkinter.font as _tkf
+        _r = _tk.Tk()
+        _r.withdraw()
+        _avail = set(_tkf.families(_r))
+        _r.destroy()
+    except Exception:
+        _avail = set()
+
+    _ui_candidates = [
+        "Noto Sans Thai", "TH Sarabun New", "Loma", "Garuda", "Norasi", "Kinnari",
+        "Noto Sans CJK", "Noto Sans", "Ubuntu", "Liberation Sans",
+        "DejaVu Sans", "FreeSans", "Cantarell",
+    ]
+    _sys_candidates = [
+        "DejaVu Sans", "Noto Sans", "Liberation Sans", "Ubuntu",
+        "Cantarell", "FreeSans", "Arial",
+    ]
+    ui  = next((f for f in _ui_candidates  if f in _avail), "sans-serif")
+    sys = next((f for f in _sys_candidates if f in _avail), "sans-serif")
+    return ui, sys
+
 if _sys.platform == "win32":
     _FONT_UI  = "Leelawadee UI"
     _FONT_SYS = "Segoe UI"
 else:
-    _FONT_UI  = "Noto Sans Thai"
-    _FONT_SYS = "DejaVu Sans"
+    _FONT_UI, _FONT_SYS = _pick_linux_fonts()
 
 FONT      = (_FONT_SYS, 12)
 FONT_SM   = (_FONT_SYS, 10)
