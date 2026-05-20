@@ -1,9 +1,18 @@
 @echo off
 chcp 65001 >nul
+
+REM Re-launch with /k so the window stays open after the script ends
+if "%1"=="__run__" goto main
+cmd /k ""%~f0" __run__"
+exit
+
+:main
 setlocal
 
 set "BASE=%~dp0"
 set "BASE=%BASE:~0,-1%"
+
+title fahsai uninstall
 
 echo.
 echo  ======================================
@@ -13,18 +22,24 @@ echo.
 echo  Folder: %BASE%
 echo.
 echo  Will delete:
-echo    %BASE%\miniconda
-echo    %BASE%\pip-cache
-echo    %BASE%\cache
-echo    %BASE%\fahsai.lnk
+echo    miniconda\       (Python environment)
+echo    pip-cache\       (download cache)
+echo    cache\           (runtime cache)
+echo    fahsai.lnk       (shortcut)
+echo    app_error.log    (log file, if present)
+echo    *.tmp in model\  (incomplete downloads, if any)
 echo.
-echo  (model folder is kept - delete manually if not needed)
+echo  Will KEEP:
+echo    model\           (LLM ~5.5 GB)
+echo    fahsai_save.json (relationship save data)
+echo    src\, app.py     (source code)
 echo.
-echo  Press Ctrl+C to cancel, or
-set /p CONFIRM= press Enter to continue:
+echo  [!] Make sure fahsai is NOT running before continuing.
+echo.
+set /p CONFIRM= Press Enter to continue (Ctrl+C to cancel):
 echo.
 
-REM --- Remove shortcut ---
+REM --- Shortcut ---
 if exist "%BASE%\fahsai.lnk" (
     del /f "%BASE%\fahsai.lnk"
     echo  [OK] Removed fahsai.lnk
@@ -32,22 +47,38 @@ if exist "%BASE%\fahsai.lnk" (
     echo  [--] fahsai.lnk not found
 )
 
-REM --- Remove miniconda ---
-echo  Checking: %BASE%\miniconda
+REM --- app_error.log ---
+if exist "%BASE%\app_error.log" (
+    del /f "%BASE%\app_error.log"
+    echo  [OK] Removed app_error.log
+)
+
+REM --- Leftover installer (interrupted setup) ---
+if exist "%BASE%\miniconda_setup.exe" (
+    del /f "%BASE%\miniconda_setup.exe"
+    echo  [OK] Removed miniconda_setup.exe
+)
+
+REM --- Partial model downloads ---
+for %%F in ("%BASE%\model\*.tmp") do (
+    del /f "%%F"
+    echo  [OK] Removed %%~nxF
+)
+
+REM --- miniconda ---
+echo  Removing miniconda...
 if exist "%BASE%\miniconda" (
-    echo  Removing miniconda ^(may take a moment^)...
     rmdir /s /q "%BASE%\miniconda"
     if exist "%BASE%\miniconda" (
-        echo  [!] Failed to remove miniconda
+        echo  [!] Failed to remove miniconda - is fahsai still running?
     ) else (
         echo  [OK] Removed miniconda
     )
 ) else (
-    echo  [--] Not found
+    echo  [--] miniconda not found
 )
 
-REM --- Remove pip-cache ---
-echo  Checking: %BASE%\pip-cache
+REM --- pip-cache ---
 if exist "%BASE%\pip-cache" (
     rmdir /s /q "%BASE%\pip-cache"
     if exist "%BASE%\pip-cache" (
@@ -56,11 +87,10 @@ if exist "%BASE%\pip-cache" (
         echo  [OK] Removed pip-cache
     )
 ) else (
-    echo  [--] Not found
+    echo  [--] pip-cache not found
 )
 
-REM --- Remove cache ---
-echo  Checking: %BASE%\cache
+REM --- cache ---
 if exist "%BASE%\cache" (
     rmdir /s /q "%BASE%\cache"
     if exist "%BASE%\cache" (
@@ -69,7 +99,7 @@ if exist "%BASE%\cache" (
         echo  [OK] Removed cache
     )
 ) else (
-    echo  [--] Not found
+    echo  [--] cache not found
 )
 
 echo.
