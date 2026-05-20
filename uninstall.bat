@@ -3,7 +3,7 @@ chcp 65001 >nul
 
 REM Re-launch with /k so the window stays open after the script ends
 if "%1"=="__run__" goto main
-cmd /k ""%~f0" __run__"
+cmd /c ""%~f0" __run__"
 exit
 
 :main
