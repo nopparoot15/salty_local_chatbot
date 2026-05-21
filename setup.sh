@@ -255,7 +255,7 @@ progress 4 6 "llama-cpp-python done"
 
 # ── 5. Core packages ──────────────────────────────────────────────────────────
 echo " Installing core packages..."
-"$PIP" install customtkinter Pillow platformdirs deep-translator \
+"$PIP" install customtkinter Pillow platformdirs deep-translator duckduckgo-search \
     --cache-dir "$CACHE" --no-warn-script-location --progress-bar on || {
     echo " [!] Failed to install core packages"
     exit 1

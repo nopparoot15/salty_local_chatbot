@@ -240,7 +240,7 @@ title fahsai setup [4/6] llama-cpp-python done
 
 REM --- 5. Core packages ---
 echo  Installing core packages...
-"%PIP%" install customtkinter Pillow platformdirs deep-translator --cache-dir "%CACHE%" --no-warn-script-location --progress-bar on
+"%PIP%" install customtkinter Pillow platformdirs deep-translator duckduckgo-search --cache-dir "%CACHE%" --no-warn-script-location --progress-bar on
 "%PIP%" show customtkinter >nul 2>&1
 if errorlevel 1 (
     echo  [!] Failed to install core packages

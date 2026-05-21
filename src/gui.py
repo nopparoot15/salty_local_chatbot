@@ -86,6 +86,7 @@ class ChatApp(ctk.CTk):
         self._avatar_frames     = []
         self._stop_event        = threading.Event()
         self._auto_scroll       = True
+        self._web_search        = True
 
         self._build()
         if _sys.platform != "win32":
@@ -177,6 +178,11 @@ class ChatApp(ctk.CTk):
                       command=self._font_smaller).pack(side=tk.LEFT, padx=2)
         ctk.CTkButton(ctrl, text="A+", **btn_kw,
                       command=self._font_larger).pack(side=tk.LEFT, padx=2)
+        self._web_btn = ctk.CTkButton(
+            ctrl, text="🌐", **{**btn_kw, "fg_color": C_ONLINE},
+            command=self._toggle_web_search,
+        )
+        self._web_btn.pack(side=tk.LEFT, padx=2)
         self._clear_btn = ctk.CTkButton(
             ctrl, text="ลบแชท", width=64, height=34, corner_radius=8,
             fg_color="#5a1a1a", hover_color="#8b2020",
@@ -349,6 +355,10 @@ class ChatApp(ctk.CTk):
         if any(k in combined for k in self._EMO_FEAR):   return 7
         if any(k in combined for k in self._EMO_SHOCK):  return 7
         return 0
+
+    def _toggle_web_search(self):
+        self._web_search = not self._web_search
+        self._web_btn.configure(fg_color=C_ONLINE if self._web_search else C_BORDER)
 
     # ── Font size ─────────────────────────────────────────────────────────────
 
@@ -813,11 +823,24 @@ class ChatApp(ctk.CTk):
         self.messages[0]["content"] = get_system_prompt(affection.get_tier_prompt())
         self.messages = self._trim_to_tokens(self.messages)
 
+        # ── Web search (optional) ──────────────────────────────────────────────
+        search_context = ""
+        if self._web_search and not self._stop_event.is_set():
+            from . import web_search
+            if web_search.should_search(user_text):
+                self.gui_q.put(("status", "กำลังค้นหา…"))
+                search_context = web_search.search(user_text)
+
         raw    = ""
         llm_ok = False
 
         try:
             msgs = list(self.messages)
+            if search_context:
+                # Inject results into the last user message – not stored in history
+                last = msgs[-1]
+                msgs[-1] = {"role": "user",
+                            "content": f"{search_context}\n\n---\n{last['content']}"}
 
             self.gui_q.put(("status", "กำลังพิมพ์…"))
             for chunk in models.llm.create_chat_completion(
