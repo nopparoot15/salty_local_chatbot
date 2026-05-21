@@ -87,6 +87,7 @@ class ChatApp(ctk.CTk):
         self._stop_event        = threading.Event()
         self._auto_scroll       = True
         self._web_search        = True
+        self._gen               = 0
 
         self._build()
         if _sys.platform != "win32":
@@ -565,7 +566,8 @@ class ChatApp(ctk.CTk):
                     elif act == "dot":
                         self._status_dot.configure(text_color=msg[1])
                     elif act == "token":
-                        self._append_token(msg[1])
+                        if len(msg) < 3 or msg[2] == self._gen:
+                            self._append_token(msg[1])
                     elif act == "user_bubble":
                         self._add_bubble(msg[1], "user")
                         if self._avatar_frames:
@@ -577,28 +579,31 @@ class ChatApp(ctk.CTk):
                         self._status_dot.configure(text_color=C_ONLINE)
                         self._entry.focus()
                     elif act == "done":
-                        if len(msg) > 1:
-                            self._last_bot_display = msg[1]
-                        self.busy = False
-                        self._set_ui(True)
-                        self._status_lbl.configure(text="ออนไลน์")
-                        self._status_dot.configure(text_color=C_ONLINE)
-                        self._finish_bot_bubble()
-                        bot_txt  = self._last_bot_display
-                        user_txt = self._last_user_display
-                        if self._avatar_frames and (bot_txt or user_txt):
-                            self._update_avatar(self._detect_emotion(bot_txt, user_txt))
-                        for bbl, role in reversed(self._bubbles):
-                            if role == "bot":
-                                bbl.finalize_with_pil()
-                                break
-                        old_tier = affection.get_tier()
-                        affection.apply_delta(affection.compute_delta(user_txt, bot_txt))
-                        new_tier = affection.get_tier()
-                        affection.save()
-                        self._update_hearts()
-                        if new_tier != old_tier:
-                            self._show_affection_note(new_tier, new_tier > old_tier)
+                        if len(msg) > 2 and msg[2] != self._gen:
+                            pass  # stale — from a previous generation, discard
+                        else:
+                            if len(msg) > 1:
+                                self._last_bot_display = msg[1]
+                            self.busy = False
+                            self._set_ui(True)
+                            self._status_lbl.configure(text="ออนไลน์")
+                            self._status_dot.configure(text_color=C_ONLINE)
+                            self._finish_bot_bubble()
+                            bot_txt  = self._last_bot_display
+                            user_txt = self._last_user_display
+                            if self._avatar_frames and (bot_txt or user_txt):
+                                self._update_avatar(self._detect_emotion(bot_txt, user_txt))
+                            for bbl, role in reversed(self._bubbles):
+                                if role == "bot":
+                                    bbl.finalize_with_pil()
+                                    break
+                            old_tier = affection.get_tier()
+                            affection.apply_delta(affection.compute_delta(user_txt, bot_txt))
+                            new_tier = affection.get_tier()
+                            affection.save()
+                            self._update_hearts()
+                            if new_tier != old_tier:
+                                self._show_affection_note(new_tier, new_tier > old_tier)
                 except Exception:
                     models.log_err("POLL ERROR:\n" + traceback.format_exc())
         finally:
@@ -763,25 +768,26 @@ class ChatApp(ctk.CTk):
         self.busy = True
         self._auto_scroll = True
         self._stop_event.clear()
+        self._gen += 1
         self._set_ui(False)
         self.gui_q.put(("user_bubble", text))
         self._pending_user_text = text
         self._last_user_display = text
         self.gui_q.put(("status", "กำลังคิด…"))
         self.gui_q.put(("dot", C_DIM))
-        threading.Thread(target=self._chat_thread, daemon=True).start()
+        threading.Thread(target=self._chat_thread, args=(self._gen,), daemon=True).start()
 
-    def _chat_thread(self):
+    def _chat_thread(self, gen):
         _done_sent = False
         try:
-            self.__chat_body()
+            self.__chat_body(gen)
             _done_sent = True
         except Exception:
             models.log_err("CHAT CRASH:\n" + traceback.format_exc())
         finally:
             if not _done_sent:
                 try:
-                    self.gui_q.put(("done",))
+                    self.gui_q.put(("done", "", gen))
                 except Exception:
                     pass
 
@@ -816,7 +822,7 @@ class ChatApp(ctk.CTk):
 
         return [sys_msg] + list(reversed(kept))
 
-    def __chat_body(self):
+    def __chat_body(self, gen):
         user_text = self._pending_user_text
         en_text   = th_to_en(user_text) if (AUTO_TRANSLATE and is_thai(user_text)) else user_text
         self.messages.append({"role": "user", "content": en_text})
@@ -858,7 +864,7 @@ class ChatApp(ctk.CTk):
                 token = (chunk["choices"][0]["delta"].get("content") or "")
                 raw += token
                 if token:
-                    self.gui_q.put(("token", token))
+                    self.gui_q.put(("token", token, gen))
                 if self._stop_event.is_set():
                     break
 
@@ -873,6 +879,6 @@ class ChatApp(ctk.CTk):
 
         if not clean and not self._stop_event.is_set():
             clean = "ขอโทษนะพี่ หนูสับสนนิดหน่อย ลองถามใหม่ได้เลย"
-            self.gui_q.put(("token", clean))
+            self.gui_q.put(("token", clean, gen))
 
-        self.gui_q.put(("done", clean))
+        self.gui_q.put(("done", clean, gen))

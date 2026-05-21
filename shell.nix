@@ -4,11 +4,11 @@ let
   cudaPkgs = if hasCuda then (with pkgs.cudaPackages; [
     cuda_cudart libcublas libcurand cuda_nvrtc
   ]) else [];
-in
-pkgs.mkShell {
   fontsConf = pkgs.makeFontsConf {
     fontDirectories = [ pkgs.noto-fonts pkgs.dejavu_fonts ];
   };
+in
+pkgs.mkShell {
   packages = [
     pkgs.python311
     pkgs.python311Packages.pip

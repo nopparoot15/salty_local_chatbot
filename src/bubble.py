@@ -126,7 +126,7 @@ class BubbleFrame(tk.Frame):
             selectbackground=C_BOT_BG, selectforeground=C_BOT_TEXT,
             inactiveselectbackground=C_BOT_BG,
             height=1, width=self._bot_char_width(),
-            spacing1=4, spacing2=2,
+            spacing1=4, spacing2=6,
         )
         self._txt.pack(padx=14, pady=10, fill="x", expand=True)
         self._txt.bindtags((str(self._txt), str(self.winfo_toplevel()), "all"))
@@ -403,6 +403,7 @@ class BubbleFrame(tk.Frame):
 
         _total_px = (_norm_dl * _m['base'] + _h1_dl * _m['h1'] +
                      _h2_dl  * _m['h2']   + _h3_dl * _m['h3'] + _cd_dl * _m['cd'])
+        _total_px += 6 * max(0, _dlines - 1)
         _new_h = max(1, (_total_px + _m['ls'] - 1) // _m['ls'])
         if _new_h != int(self._txt.cget("height")):
             self._txt.configure(height=_new_h)
