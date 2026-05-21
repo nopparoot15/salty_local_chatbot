@@ -122,6 +122,24 @@ def _get_lottery() -> str:
         return ""
 
 
+def _get_oil_price() -> str:
+    usdthb = _yf("USDTHB=X")
+    wti    = _yf("CL=F")
+    brent  = _yf("BZ=F")
+    if wti is None and brent is None:
+        return ""
+    lines = ["[ราคาน้ำมันดิบปัจจุบัน (Yahoo Finance)]"]
+    if wti:
+        thb = f" ≈ {wti * usdthb:,.0f} THB/bbl" if usdthb else ""
+        lines.append(f"WTI Crude   : {wti:,.2f} USD/bbl{thb}")
+    if brent:
+        thb = f" ≈ {brent * usdthb:,.0f} THB/bbl" if usdthb else ""
+        lines.append(f"Brent Crude : {brent:,.2f} USD/bbl{thb}")
+    if usdthb:
+        lines.append(f"อัตราแลกเปลี่ยน: 1 USD = {usdthb:.2f} THB")
+    return "\n".join(lines)
+
+
 def _get_fx(pair_symbol: str, pair_label: str) -> str:
     rate = _yf(pair_symbol)
     if rate is None:
@@ -141,6 +159,7 @@ def _get_crypto(symbol: str, label: str) -> str:
 # ── Routing keywords → fetcher ─────────────────────────────────────────────
 
 _LOTTERY_KW = ["หวย", "สลาก", "ลอตเตอรี", "lottery", "lotto", "ตรวจหวย"]
+_OIL_KW   = ["น้ำมัน", "oil", "ปิโตรเลียม", "crude", "wti", "brent", "ราคาน้ำมัน"]
 _GOLD_KW  = ["ทอง", "gold", "ราคาทอง"]
 _BTC_KW   = ["bitcoin", "btc", "บิตคอยน์", "บิตคอย"]
 _ETH_KW   = ["ethereum", "eth", "อีเธอเรียม"]
@@ -151,6 +170,8 @@ def _special_fetch(text: str) -> str:
     tl = text.lower()
     if any(k in tl for k in _LOTTERY_KW):
         return _get_lottery()
+    if any(k in tl for k in _OIL_KW):
+        return _get_oil_price()
     if any(k in tl for k in _GOLD_KW):
         return _get_gold_price()
     if any(k in tl for k in _BTC_KW):
@@ -187,6 +208,8 @@ def _ddg_news(query: str, max_results: int = 4) -> str:
 _TRIGGERS = [
     # lottery
     "หวย", "สลาก", "ลอตเตอรี", "ตรวจหวย",
+    # oil
+    "น้ำมัน", "ปิโตรเลียม", "oil", "crude",
     # price / finance
     "ราคา", "หุ้น", "ดัชนี", "ตลาดหุ้น", "fund", "กองทุน",
     "bitcoin", "btc", "crypto", "forex", "ดอลลาร์", "เงินบาท",
