@@ -58,86 +58,93 @@ def _get_gold_price() -> str:
     )
 
 
-def _get_lottery() -> str:
-    """Get latest Thai government lottery results via DuckDuckGo news."""
-    if not _DDGS_OK:
-        return ""
+def _latest_draw_date() -> datetime.date:
     today = datetime.date.today()
-    # Thai lotto draws on 1st and 16th of each month
     if today.day >= 16:
         draw = today.replace(day=16)
     else:
-        # Last draw was on the 1st of this month or 16th of last month
-        if today.day >= 1:
-            draw = today.replace(day=1)
-        else:
-            prev = today.replace(day=1) - datetime.timedelta(days=1)
-            draw = prev.replace(day=16)
-    # If draw date is today or future, go back one period
+        draw = today.replace(day=1)
     if draw >= today:
         if draw.day == 16:
             draw = draw.replace(day=1)
         else:
             prev = draw - datetime.timedelta(days=1)
             draw = prev.replace(day=16)
+    return draw
 
-    _TH_MONTH = ["","มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
-                 "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"]
-    bud_year = draw.year + 543
-    short_date = f"{draw.day}/{draw.month}/{str(bud_year)[-2:]}"
-    long_date = f"{draw.day} {_TH_MONTH[draw.month]} {bud_year}"
-    query = f"ผลหวยรัฐบาล {short_date} รางวัลที่1"
+
+def _get_lottery() -> str:
+    """Scrape Thai lottery results from news.sanook.com/lotto/."""
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.news(query, max_results=5))
-        if not results:
+        url = "https://news.sanook.com/lotto/"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        html = urllib.request.urlopen(req, timeout=8).read().decode("utf-8", "replace")
+
+        # Results live in a JSON-LD block — literal \r\n sequences in source
+        idx = html.find("รางวัลที่ 1")
+        if idx == -1:
             return ""
-        # Try to extract the first prize 6-digit number from snippets
-        first_prize = None
-        lines = [f"[ผลสลากกินแบ่งรัฐบาล งวด {long_date}]"]
-        for r in results:
-            body = (r.get("body") or "").strip()
-            title = (r.get("title") or "").strip()
-            combined = title + " " + body
-            if not first_prize:
-                # Look for 6-digit after prize keywords
-                m = re.search(r'รางวัลที่\s*1[^\d]*(\d{6})', combined)
-                if m:
-                    first_prize = m.group(1)
-                else:
-                    # Standalone 6-digit that looks like a prize (not a date)
-                    candidates = re.findall(r'\b(\d{6})\b', combined)
-                    for c in candidates:
-                        if not re.match(r'(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])\d{2}', c):
-                            first_prize = c
-                            break
-            if body and len(body) > 30:
-                lines.append(body[:250])
-                if len(lines) >= 4:
-                    break
-        if first_prize:
-            lines.insert(1, f"รางวัลที่ 1: {first_prize}")
-        return "\n\n".join(lines)
+        block = html[idx:idx + 600]
+        # Unescape JSON-LD literal sequences → real newlines/spaces
+        block = block.replace("\\r\\n", "\n").replace("\\n", "\n")
+        block = block.replace("&nbsp;", " ")
+
+        def grab(pattern):
+            m = re.search(pattern, block, re.DOTALL)
+            if not m:
+                return None
+            return re.sub(r"\s+", " ", m.group(1)).strip()
+
+        # Prize numbers follow on the NEXT LINE after the label
+        first   = grab(r"รางวัลที่ 1[^\n]*\n(\d{6})")
+        three_f = grab(r"เลขหน้า 3 ตัว[^\n]*\n([\d\s]+)")
+        three_b = grab(r"เลขท้าย 3 ตัว[^\n]*\n([\d\s]+)")
+        two     = grab(r"เลขท้าย 2 ตัว[^\n]*\n(\d{2})")
+
+        # Find draw date from page title / og:title
+        date_m = re.search(
+            r"(\d{1,2})[/\s](มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|"
+            r"กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)[/\s](\d{4})", html)
+        draw_label = date_m.group(0) if date_m else "งวดล่าสุด"
+
+        lines = [f"[ผลสลากกินแบ่งรัฐบาล งวด {draw_label} (sanook)]"]
+        if first:
+            lines.append(f"รางวัลที่ 1       : {first}")
+        if three_f:
+            nums = " ".join(re.findall(r"\d{3}", three_f))
+            if nums: lines.append(f"เลขหน้า 3 ตัว    : {nums}")
+        if three_b:
+            nums = " ".join(re.findall(r"\d{3}", three_b))
+            if nums: lines.append(f"เลขท้าย 3 ตัว    : {nums}")
+        if two:
+            lines.append(f"เลขท้าย 2 ตัว    : {two}")
+        return "\n".join(lines) if len(lines) > 1 else ""
     except Exception:
         return ""
 
 
 def _get_oil_price() -> str:
-    usdthb = _yf("USDTHB=X")
-    wti    = _yf("CL=F")
-    brent  = _yf("BZ=F")
-    if wti is None and brent is None:
+    """Scrape Thai pump prices from gasprice.kapook.com."""
+    try:
+        url = "https://gasprice.kapook.com/gasprice.php"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        html = urllib.request.urlopen(req, timeout=8).read().decode("utf-8", "replace")
+        # Each brand block: <article class="gasprice ptt"> ... <li><span>FUEL</span><em>PRICE</em></li>
+        # Use PTT as reference (first brand)
+        brand_m = re.search(
+            r'<article class="gasprice ptt">.*?</article>', html, re.DOTALL)
+        if not brand_m:
+            return ""
+        block = brand_m.group(0)
+        pairs = re.findall(r'<span>([^<]+)</span><em>([\d.]+)</em>', block)
+        if not pairs:
+            return ""
+        lines = ["[ราคาน้ำมันหน้าปั๊ม ปตท. (gasprice.kapook.com)]"]
+        for fuel, price in pairs:
+            lines.append(f"{fuel.strip():<22}: {price} บาท/ลิตร")
+        return "\n".join(lines)
+    except Exception:
         return ""
-    lines = ["[ราคาน้ำมันดิบปัจจุบัน (Yahoo Finance)]"]
-    if wti:
-        thb = f" ≈ {wti * usdthb:,.0f} THB/bbl" if usdthb else ""
-        lines.append(f"WTI Crude   : {wti:,.2f} USD/bbl{thb}")
-    if brent:
-        thb = f" ≈ {brent * usdthb:,.0f} THB/bbl" if usdthb else ""
-        lines.append(f"Brent Crude : {brent:,.2f} USD/bbl{thb}")
-    if usdthb:
-        lines.append(f"อัตราแลกเปลี่ยน: 1 USD = {usdthb:.2f} THB")
-    return "\n".join(lines)
 
 
 def _get_fx(pair_symbol: str, pair_label: str) -> str:
