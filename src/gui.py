@@ -691,6 +691,15 @@ class ChatApp(ctk.CTk):
         self._type_buf      = ""
         self._type_pos      = 0
         self._auto_scroll   = True
+        self._scroll_queued = False
+        # Reset canvas scroll region so yview_moveto(1.0) doesn't land on stale blank space
+        try:
+            c = self._scroll._parent_canvas
+            c.configure(scrollregion=(0, 0, 0, 0))
+            c.yview_moveto(0)
+        except Exception:
+            pass
+        self.update_idletasks()
         self._stop_event.clear()
         self._set_ui(True)
         self._status_lbl.configure(text="ออนไลน์")
