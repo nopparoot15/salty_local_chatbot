@@ -3,10 +3,14 @@ from __future__ import annotations
 
 _DDGS_OK = False
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
     _DDGS_OK = True
 except ImportError:
-    pass
+    try:
+        from duckduckgo_search import DDGS
+        _DDGS_OK = True
+    except ImportError:
+        pass
 
 _TRIGGERS = [
     # Thai
