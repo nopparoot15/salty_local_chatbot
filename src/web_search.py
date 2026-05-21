@@ -2,10 +2,13 @@
 
 Sources:
 - Gold / FX / crypto price  → Yahoo Finance (no API key)
+- Thai lottery results       → DuckDuckGo news (ddgs) with date-specific query
 - General queries           → DuckDuckGo news (ddgs)
 """
 from __future__ import annotations
 import json
+import re
+import datetime
 import urllib.request
 import urllib.error
 
@@ -55,6 +58,70 @@ def _get_gold_price() -> str:
     )
 
 
+def _get_lottery() -> str:
+    """Get latest Thai government lottery results via DuckDuckGo news."""
+    if not _DDGS_OK:
+        return ""
+    today = datetime.date.today()
+    # Thai lotto draws on 1st and 16th of each month
+    if today.day >= 16:
+        draw = today.replace(day=16)
+    else:
+        # Last draw was on the 1st of this month or 16th of last month
+        if today.day >= 1:
+            draw = today.replace(day=1)
+        else:
+            prev = today.replace(day=1) - datetime.timedelta(days=1)
+            draw = prev.replace(day=16)
+    # If draw date is today or future, go back one period
+    if draw >= today:
+        if draw.day == 16:
+            draw = draw.replace(day=1)
+        else:
+            prev = draw - datetime.timedelta(days=1)
+            draw = prev.replace(day=16)
+
+    _TH_MONTH = ["","มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
+                 "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"]
+    bud_year = draw.year + 543
+    short_date = f"{draw.day}/{draw.month}/{str(bud_year)[-2:]}"
+    long_date = f"{draw.day} {_TH_MONTH[draw.month]} {bud_year}"
+    query = f"ผลหวยรัฐบาล {short_date} รางวัลที่1"
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.news(query, max_results=5))
+        if not results:
+            return ""
+        # Try to extract the first prize 6-digit number from snippets
+        first_prize = None
+        lines = [f"[ผลสลากกินแบ่งรัฐบาล งวด {long_date}]"]
+        for r in results:
+            body = (r.get("body") or "").strip()
+            title = (r.get("title") or "").strip()
+            combined = title + " " + body
+            if not first_prize:
+                # Look for 6-digit after prize keywords
+                m = re.search(r'รางวัลที่\s*1[^\d]*(\d{6})', combined)
+                if m:
+                    first_prize = m.group(1)
+                else:
+                    # Standalone 6-digit that looks like a prize (not a date)
+                    candidates = re.findall(r'\b(\d{6})\b', combined)
+                    for c in candidates:
+                        if not re.match(r'(0[1-9]|[12]\d|3[01])(0[1-9]|1[0-2])\d{2}', c):
+                            first_prize = c
+                            break
+            if body and len(body) > 30:
+                lines.append(body[:250])
+                if len(lines) >= 4:
+                    break
+        if first_prize:
+            lines.insert(1, f"รางวัลที่ 1: {first_prize}")
+        return "\n\n".join(lines)
+    except Exception:
+        return ""
+
+
 def _get_fx(pair_symbol: str, pair_label: str) -> str:
     rate = _yf(pair_symbol)
     if rate is None:
@@ -73,6 +140,7 @@ def _get_crypto(symbol: str, label: str) -> str:
 
 # ── Routing keywords → fetcher ─────────────────────────────────────────────
 
+_LOTTERY_KW = ["หวย", "สลาก", "ลอตเตอรี", "lottery", "lotto", "ตรวจหวย"]
 _GOLD_KW  = ["ทอง", "gold", "ราคาทอง"]
 _BTC_KW   = ["bitcoin", "btc", "บิตคอยน์", "บิตคอย"]
 _ETH_KW   = ["ethereum", "eth", "อีเธอเรียม"]
@@ -81,6 +149,8 @@ _USDTHB_KW = ["usd", "ดอลลาร์", "dollar", "เหรียญ", "u
 
 def _special_fetch(text: str) -> str:
     tl = text.lower()
+    if any(k in tl for k in _LOTTERY_KW):
+        return _get_lottery()
     if any(k in tl for k in _GOLD_KW):
         return _get_gold_price()
     if any(k in tl for k in _BTC_KW):
@@ -115,6 +185,8 @@ def _ddg_news(query: str, max_results: int = 4) -> str:
 # ── Trigger detection ─────────────────────────────────────────────────────────
 
 _TRIGGERS = [
+    # lottery
+    "หวย", "สลาก", "ลอตเตอรี", "ตรวจหวย",
     # price / finance
     "ราคา", "หุ้น", "ดัชนี", "ตลาดหุ้น", "fund", "กองทุน",
     "bitcoin", "btc", "crypto", "forex", "ดอลลาร์", "เงินบาท",
