@@ -831,6 +831,10 @@ class ChatApp(ctk.CTk):
                 self.gui_q.put(("status", "กำลังค้นหา…"))
                 search_context = web_search.search(user_text)
 
+        # If clear was pressed while searching, abort before touching LLM
+        if self._stop_event.is_set():
+            return
+
         raw    = ""
         llm_ok = False
 
